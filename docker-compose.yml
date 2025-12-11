@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  # Kestra - Workflow Orchestration
+  kestra:
+    image: kestra/kestra:latest
+    pull_policy: always
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - /app/kestra server standalone --worker-thread=128
+    volumes:
+      - kestra-data:/app/storage
+      - ./kestra/flows:/app/flows
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/kestra-wd:/tmp/kestra-wd
+    environment:
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://postgres:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: kestra
+            password: k3str4
+        kestra:
+          server:
+            basic-auth:
+              enabled: false
+              username: admin@kestra.io
+              password: kestra
+          repository:
+            type: postgres
+          storage:
+            type: local
+            local:
+              base-path: "/app/storage"
+          queue:
+            type: postgres
+          tasks:
+            tmp-dir:
+              path: /tmp/kestra-wd/tmp
+          url: http://localhost:8080/
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - devops-network
+
+  # PostgreSQL - Database for Kestra
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: k3str4
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kestra"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devops-network
+
+  # MCP Server - Cline Bridge
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - DASHBOARD_URL=http://dashboard:3000
+      - KESTRA_URL=http://kestra:8080
+    depends_on:
+      - kestra
+    volumes:
+      - ./mcp-server:/app
+      - /app/node_modules
+    networks:
+      - devops-network
+
+  # Dashboard - Next.js Frontend
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_KESTRA_URL=http://localhost:8080
+      - NEXT_PUBLIC_MCP_URL=http://localhost:3001
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    depends_on:
+      - kestra
+      - mcp-server
+    volumes:
+      - ./dashboard:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - devops-network
+
+volumes:
+  kestra-data:
+    driver: local
+  postgres-data:
+    driver: local
+
+networks:
+  devops-network:

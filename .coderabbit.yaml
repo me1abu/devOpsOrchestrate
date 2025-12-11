@@ -1,0 +1,141 @@
+# CodeRabbit Configuration for Self-Healing DevOps PR Reviews
+# This file should be placed in the target repository (.coderabbit.yaml)
+
+reviews:
+  auto_review:
+    enabled: true
+    drafts: true  # Review even draft PRs created by automation
+
+  path_filters:
+    - "!*.md"      # Skip markdown files
+    - "!*.txt"     # Skip text files
+    - "!docs/**"   # Skip documentation
+    - "!*.log"     # Skip log files
+    - "!*.csv"     # Skip data files
+
+  required_score: 75  # Minimum quality score threshold
+
+tools:
+  # Code quality tools
+  shellcheck:
+    enabled: true
+    severity_threshold: "warning"
+
+  ruff:
+    enabled: true
+    config: ".ruff.toml"  # Can be configured per repository
+
+  # Security scanning
+  bandit:
+    enabled: false  # Enable for Python repos
+
+  # Docker security
+  trivy:
+    enabled: true
+    scan_type: "filesystem"
+    skip_files:
+      - "*.test.*"
+      - "*test*"
+
+chat:
+  auto_reply: true
+
+  # Custom prompts for our self-healing scenario
+  review_prompts:
+    - |
+      This PR was created by our autonomous DevOps system to fix a critical infrastructure issue.
+      Please focus on:
+      1. Code correctness and potential bugs
+      2. Security implications of the changes
+      3. Configuration validation
+      4. Impact on system reliability
+
+      If you find issues, categorize them by severity:
+      - 🔴 Critical: Prevents deployment or introduces security risks
+      - 🟡 High: Significant issues that should be reviewed
+      - 🟢 Medium: Minor improvements suggested
+      - 🔵 Info: Best practices and style suggestions
+
+# Custom review rules for infrastructure code
+rules:
+  critical:
+    # Database configuration changes
+    - pattern: 'max_connections|connection_pool|database.*config'
+      message: |
+        🚨 **Database Configuration Change Detected**
+
+        This change affects database connectivity. Please verify:
+        - Connection limits are appropriate for production load
+        - No service disruptions during rollout
+        - Rollback plan exists if issues occur
+
+    # Memory or resource limits
+    - pattern: 'memory_limit|cpu_limit|resource.*limit'
+      message: |
+        🚨 **Resource Limit Change**
+
+        Resource limits have been modified. Ensure:
+        - Limits are appropriate for current infrastructure
+        - Monitoring alerts are configured
+        - Performance impact is understood
+
+    # Security-related changes
+    - pattern: 'password|secret|token|auth|ssl|tls'
+      message: |
+        🔐 **Security-Sensitive Change**
+
+        This change affects security controls. Verify:
+        - No credentials are exposed in code/logs
+        - Security best practices are followed
+        - Compliance requirements are met
+
+  warning:
+    # Configuration file changes
+    - pattern: '\.(yml|yaml|json|toml|ini|cfg|conf)$'
+      message: |
+        ⚠️ **Configuration File Modified**
+
+        Configuration changes can have broad impact:
+        - Validate syntax and schema
+        - Test in staging environment first
+        - Document the change for future reference
+
+  info:
+    # Code comments and documentation
+    - pattern: '# TODO|# FIXME|# NOTE'
+      message: |
+        💡 **Code Comment Found**
+
+        Code contains development notes - consider:
+        - Addressing TODO items before production
+        - Improving error messages and documentation
+
+# GitHub integration
+github_checks:
+  enabled: true
+  on_failure: "request_changes"
+
+# Notifications
+notifications:
+  slack:
+    enabled: false  # Can be enabled per organization
+  github:
+    enabled: true
+    on_review_completed: true
+    on_blocking_comments: true
+
+# Custom labels for AI-generated PRs
+labels:
+  - name: "🤖 ai-generated"
+    description: "This PR was created by our autonomous DevOps system"
+    color: "006b75"
+
+  - name: "🚨 critical-fix"
+    description: "Addresses a critical infrastructure issue"
+    color: "b60205"
+
+  - name: "🔧 auto-fix"
+    description: "Automated fix for operational issue"
+    color: "0e8a16"
+</parameter>
+</write_to_file>

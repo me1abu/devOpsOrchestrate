@@ -1,0 +1,59 @@
+# Oumi Configuration for Self-Healing DevOps SRE-LLM Training
+
+model:
+  base: "meta-llama/Llama-3-8B-Instruct"
+  quantization: "4bit"
+  trust_remote_code: true
+
+training:
+  method: "lora"
+  lora_rank: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+  epochs: 3
+  batch_size: 4
+  gradient_accumulation_steps: 2
+  learning_rate: 2e-4
+  warmup_steps: 100
+  logging_steps: 10
+  save_steps: 500
+  save_total_limit: 2
+  max_grad_norm: 1.0
+
+  optimizer: "adamw_torch"
+  lr_scheduler: "cosine"
+
+data:
+  format: "instruction"
+  train_path: "./data/sre_train.jsonl"
+  eval_path: "./data/sre_eval.jsonl"
+  max_length: 2048
+  preprocessing_num_workers: 4
+
+output:
+  output_dir: "./models/sre-llm"
+  adapter_dir: "./checkpoints/sre-llm-adapter"
+
+evaluation:
+  do_eval: true
+  eval_steps: 500
+  per_device_eval_batch_size: 4
+
+inference:
+  # Configuration for inference after training
+  max_new_tokens: 256
+  temperature: 0.1
+  do_sample: false
+  pad_token_id: 2
+  eos_token_id: 2
+</parameter>
+</write_to_file>

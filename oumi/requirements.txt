@@ -1,0 +1,13 @@
+oumi[torch]>=0.1.0
+accelerate>=0.20.0
+transformers>=4.21.0
+datasets>=2.8.0
+torch>=2.0.0
+peft>=0.4.0
+bitsandbytes>=0.41.0  # For 4-bit quantization
+deepspeed>=0.9.0  # Optional, for distributed training
+wandb>=0.13.0  # Optional, for logging
+PyYAML>=6.0
+pathlib2>=2.3.0
+</parameter>
+</write_to_file>

@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-gray-900 border border-gray-800 rounded-lg p-6;
+  }
+
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-4 py-2 rounded-lg transition-colors;
+  }
+
+  .status-critical {
+    @apply bg-red-900/20 text-red-400 border border-red-800;
+  }
+
+  .status-high {
+    @apply bg-yellow-900/20 text-yellow-400 border border-yellow-800;
+  }
+
+  .status-medium {
+    @apply bg-blue-900/20 text-blue-400 border border-blue-800;
+  }
+
+  .status-low {
+    @apply bg-gray-900/20 text-gray-400 border border-gray-800;
+  }
+
+  .status-fixed {
+    @apply bg-green-900/20 text-green-400 border border-green-800;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}

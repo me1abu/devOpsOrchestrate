@@ -1,0 +1,29 @@
+# Database Configuration for Demo App
+#
+# This is a sample configuration file that will be targeted
+# by the self-healing DevOps system during demos.
+
+database:
+  host: localhost
+  port: 5432
+  name: demo_app
+  username: demo_user
+  password: demo_password
+
+  # Connection pool settings
+  pool:
+    min_connections: 5
+    max_connections: 100  # This will be increased by the auto-fix system
+
+  # Timeout settings
+  connection_timeout: 30s
+  query_timeout: 60s
+
+  # SSL settings
+  ssl:
+    enabled: true
+    ca_cert: /etc/ssl/certs/ca.pem
+    client_cert: /etc/ssl/certs/client.pem
+    client_key: /etc/ssl/private/client.key
+</parameter>
+</write_to_file>
