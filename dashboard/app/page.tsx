@@ -270,7 +270,7 @@ function DemoTriggerPanel() {
         <button
           onClick={triggerDemo}
           disabled={isTriggering}
-          className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-excluded"
+          className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isTriggering ? (
             <div className="flex items-center justify-center space-x-2">
@@ -306,7 +306,7 @@ export default function Dashboard() {
         category: 'database',
         summary: 'Database connection pool exhausted',
         description: 'PostgreSQL connection pool reached max_connections=100, causing service degradation',
-        pr_url: 'https://github.com/example/repo/pull/47',
+        pr_url: 'https://github.com/me1abu/self-healing-demo-target/pull/47',
         pr_number: 47,
         created_at: new Date(Date.now() - 120000).toISOString(),
         fixed_at: new Date().toISOString(),

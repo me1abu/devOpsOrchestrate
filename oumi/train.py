@@ -179,5 +179,3 @@ def test_inference(model_path: str):
 
 if __name__ == "__main__":
     main()
-</parameter>
-</write_to_file>

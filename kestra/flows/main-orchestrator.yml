@@ -12,7 +12,20 @@ triggers:
   - id: webhook-trigger
     type: io.kestra.plugin.core.trigger.Webhook
     key: "incident-webhook"
-    
+
+  - id: manual-trigger
+    type: io.kestra.plugin.core.trigger.Flow
+    inputs:
+      log_source:
+        type: STRING
+        defaults: "manual-demo"
+      raw_log:
+        type: STRING
+        defaults: "CRITICAL: Database connection pool exhausted - max_connections=100 exceeded (manual demo)"
+      severity_override:
+        type: STRING
+        required: false
+
   - id: schedule-poll
     type: io.kestra.plugin.core.trigger.Schedule
     cron: "*/30 * * * * *"
@@ -193,5 +206,40 @@ tasks:
 
 errors:
   - id: error-handler
-    type: io.kestra.plugin.core.log.Log
-    message: "Error in orchestrator: {{ task.id }} failed with {{ task.status }}"
+    type: io.kestra.plugin.core.flow.Sequential
+    tasks:
+      - id: update-incident-error-status
+        type: io.kestra.plugin.core.http.Request
+        uri: "{{ vars.mcp_server_url }}/incidents/{{ json(outputs['create-incident'].body).id || 'unknown' }}"
+        method: PATCH
+        contentType: application/json
+        body: |
+          {
+            "status": "failed",
+            "error_message": "Main orchestration failed during {{ task.id }}: {{ task.status }}",
+            "error_details": "{{ execution.errors }}"
+          }
+
+      - id: notify-dashboard-error
+        type: io.kestra.plugin.core.http.Request
+        uri: "{{ vars.dashboard_url }}/api/kestra-webhook"
+        method: POST
+        contentType: application/json
+        body: |
+          {
+            "type": "orchestration_error",
+            "execution_id": "{{ execution.id }}",
+            "error_task": "{{ task.id }}",
+            "error_status": "{{ task.status }}",
+            "error_message": "AI orchestration failed during incident processing"
+          }
+
+      - id: log-error
+        type: io.kestra.plugin.core.log.Log
+        level: ERROR
+        message: |
+          ❌ Orchestration ERROR:
+          Task: {{ task.id }}
+          Status: {{ task.status }}
+          Error Details: {{ execution.errors }}
+          Incident ID: {{ json(outputs['create-incident'].body).id || 'unknown' }}

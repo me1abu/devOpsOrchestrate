@@ -64,10 +64,65 @@ tasks:
       ⏰ Waiting for Cline to complete the fix...
 
   - id: wait-for-fix
-    type: io.kestra.plugin.core.flow.Sleep
-    duration: PT2M  # Wait 2 minutes for Cline to process
+    type: io.kestra.plugin.core.flow.ForEachItem
+    items: "{{ range(1, 30) }}"  # Poll for up to 30 iterations (5 minutes at 10s intervals)
+    itemLabel: "Poll attempt {{ index }}"
+    iterable: "{{ range(1, 30) }}"
+    tasks:
+      - id: check-fix-status-polling
+        type: io.kestra.plugin.core.http.Request
+        uri: "{{ vars.mcp_server_url }}/incidents/{{ inputs.incident_id }}"
+        method: GET
+        timeout: PT30S  # 30 second timeout per request
 
-  - id: check-fix-status
+      - id: evaluate-fix-result-polling
+        type: io.kestra.plugin.scripts.python.Script
+        containerImage: python:3.11-slim
+        beforeCommands:
+          - pip install requests
+        script: |
+          import json
+          import sys
+
+          try:
+            # Get incident status
+            incident_data = json.loads("""{{ outputs['check-fix-status-polling'].body }}""")
+            status = incident_data.get('status', 'pending')
+
+            # Stop polling if incident is resolved
+            if status in ['fixed', 'failed', 'needs_review']:
+              result = {
+                "completed": True,
+                "status": status,
+                "pr_url": incident_data.get('pr_url'),
+                "incident_data": incident_data
+              }
+              print(json.dumps(result))
+              sys.exit(0)  # Success - exit the loop
+            else:
+              result = {
+                "completed": False,
+                "status": status,
+                "attempt": {{ index }}
+              }
+              print(json.dumps(result))
+              sys.exit(1)  # Continue polling
+
+          except Exception as e:
+            result = {
+              "completed": False,
+              "error": str(e),
+              "attempt": {{ index }}
+            }
+            print(json.dumps(result))
+            sys.exit(1)
+
+      - id: wait-before-next-poll
+        type: io.kestra.plugin.core.flow.Sleep
+        duration: PT10S  # Wait 10 seconds between polls
+        disabled: "{{ json(outputs['evaluate-fix-result-polling'].vars.stdout).completed == true }}"
+
+  - id: get-final-incident-status
     type: io.kestra.plugin.core.http.Request
     uri: "{{ vars.mcp_server_url }}/incidents/{{ inputs.incident_id }}"
     method: GET

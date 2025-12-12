@@ -25,9 +25,13 @@ services:
         kestra:
           server:
             basic-auth:
-              enabled: false
+              enabled: true
               username: admin@kestra.io
-              password: kestra
+              password: Kestra123
+            enterprise-edition:
+              auth:
+                basic-auth:
+                  enabled: true
           repository:
             type: postgres
           storage:

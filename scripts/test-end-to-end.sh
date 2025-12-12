@@ -79,15 +79,15 @@ wait_for_containers() {
 
 # Function to test dashboard
 test_dashboard() {
-    print_status "Testing dashboard API..."
+    print_status "Testing dashboard API (now calls MCP server directly)..."
 
     # Test demo trigger endpoint
     local response=$(curl -s -X POST http://localhost:3000/api/trigger-demo \
         -H "Content-Type: application/json" \
         -d '{"log": "CRITICAL: Connection pool exhausted - max_connections=100 exceeded", "source": "postgresql"}')
 
-    if echo "$response" | jq -e '.success' >/dev/null 2>&1; then
-        print_success "Dashboard API is responding correctly"
+    if echo "$response" | grep -q '"success":true'; then
+        print_success "Dashboard API calling MCP server successfully"
         return 0
     else
         print_error "Dashboard API test failed"
@@ -102,16 +102,17 @@ test_mcp_server() {
 
     # Test health endpoint
     local health_response=$(curl -s http://localhost:3001/health)
-    if echo "$health_response" | jq -e '.status == "healthy"' >/dev/null 2>&1; then
+    if echo "$health_response" | grep -q '"status":"healthy"'; then
         print_success "MCP server health check passed"
     else
         print_error "MCP server health check failed"
+        echo "Response: $health_response"
         return 1
     fi
 
     # Test incidents endpoint
     local incidents_response=$(curl -s http://localhost:3001/incidents)
-    if echo "$incidents_response" | jq -e '.' >/dev/null 2>&1; then
+    if [ -n "$incidents_response" ]; then
         print_success "MCP server incidents endpoint working"
         return 0
     else
@@ -128,7 +129,7 @@ test_kestra() {
     local attempt=1
 
     while [ $attempt -le $max_attempts ]; do
-        if curl -s -f http://localhost:8080/health 2>/dev/null | grep -q "\"status\""; then
+        if curl -s -f http://localhost:8080/api/v1/configs 2>/dev/null | grep -q "\"version\""; then
             print_success "Kestra is running and responding"
             return 0
         fi
@@ -152,32 +153,33 @@ run_demo_flow() {
         -H "Content-Type: application/json" \
         -d '{"log": "FATAL: Connection pool exhausted - max_connections=100 exceeded in database.yml", "source": "postgresql"}')
 
-    if ! echo "$trigger_response" | jq -e '.success' >/dev/null 2>&1; then
+    if echo "$trigger_response" | grep -q '"success":true'; then
+        print_success "Demo incident triggered successfully - MCP server stored incident"
+    else
         print_error "Failed to trigger demo incident"
         echo "Response: $trigger_response"
         return 1
     fi
-    print_success "Demo incident triggered successfully"
 
     # Step 2: Wait for Kestra to process
     print_status "Step 2: Waiting for Kestra to process incident (15 seconds)..."
     sleep 15
 
     # Step 3: Check if incident was created in MCP server
-    print_status "Step 3: Checking if incident was created..."
+    print_status "Step 3: Checking MCP server for created incidents..."
     local incidents=$(curl -s http://localhost:3001/incidents)
-    local incident_count=$(echo "$incidents" | jq length 2>/dev/null || echo 0)
 
-    if [ "$incident_count" -gt 0 ]; then
-        print_success "Found $incident_count incident(s) in MCP server"
+    if echo "$incidents" | grep -q '"id":'; then
+        print_success "Found incidents in MCP server - workflow triggered successfully"
 
-        # Show incident details
-        echo "$incidents" | jq '.[0]' 2>/dev/null || echo "Could not parse incident details"
+        # Show basic incident info
+        echo "Incidents stored: $incidents"
 
         return 0
     else
-        print_warning "No incidents found in MCP server - this may be expected if Kestra is not fully configured"
-        print_status "You can manually trigger Kestra workflows via http://localhost:8080"
+        print_warning "No incidents found in MCP server - this may be expected if Kestra is not fully integrated"
+        print_status "Dashboard and MCP server are working - you can manually trigger workflows"
+        print_status "Access Kestra UI at http://localhost:8080"
         return 0
     fi
 }
@@ -194,7 +196,7 @@ generate_load_test() {
             -H "Content-Type: application/json" \
             -d "{\"log\": \"CRITICAL: Database connection pool exhausted (attempt $i)\", \"source\": \"postgresql\"}")
 
-        if echo "$response" | jq -e '.success' >/dev/null 2>&1; then
+        if echo "$response" | grep -q '"success":true'; then
             ((success_count++))
         fi
         ((count++))

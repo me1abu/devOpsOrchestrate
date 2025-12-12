@@ -154,7 +154,7 @@ python log-generator.py --scenario database_crash --count 5 --output test-incide
 ```bash
 # Make sure everything is running
 docker-compose up -d
-cd dashboard && npm run dev
+cd dashboard ; npm run dev
 ```
 
 ### 2. Open Dashboard
