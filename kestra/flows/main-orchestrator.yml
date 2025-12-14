@@ -5,31 +5,11 @@ description: Main orchestration flow for incident detection and auto-fix
 variables:
   mcp_server_url: "http://mcp-server:3001"
   dashboard_url: "http://dashboard:3000"
-  oumi_endpoint: "{{ envs.OUMI_API_ENDPOINT }}"
-  github_token: "{{ secret('GITHUB_TOKEN') }}"
 
 triggers:
   - id: webhook-trigger
     type: io.kestra.plugin.core.trigger.Webhook
     key: "incident-webhook"
-
-  - id: manual-trigger
-    type: io.kestra.plugin.core.trigger.Flow
-    inputs:
-      log_source:
-        type: STRING
-        defaults: "manual-demo"
-      raw_log:
-        type: STRING
-        defaults: "CRITICAL: Database connection pool exhausted - max_connections=100 exceeded (manual demo)"
-      severity_override:
-        type: STRING
-        required: false
-
-  - id: schedule-poll
-    type: io.kestra.plugin.core.trigger.Schedule
-    cron: "*/30 * * * * *"
-    disabled: true  # Enable for continuous monitoring
 
 inputs:
   - id: log_source
@@ -37,10 +17,19 @@ inputs:
     defaults: "demo"
   - id: raw_log
     type: STRING
-    required: false
-  - id: severity_override
+    defaults: ""
+  - id: severity
     type: STRING
-    required: false
+    defaults: ""
+  - id: category
+    type: STRING
+    defaults: ""
+  - id: summary
+    type: STRING
+    defaults: ""
+  - id: suggested_fix
+    type: STRING
+    defaults: ""
 
 tasks:
   - id: normalize-input
@@ -48,108 +37,118 @@ tasks:
     containerImage: python:3.11-slim
     script: |
       import json
-      import sys
+      import random
       from datetime import datetime
-      
-      # Get input log
-      raw_log = """{{ inputs.raw_log }}"""
-      log_source = """{{ inputs.log_source }}"""
-      
+
+      # Get inputs
+      raw_log = """{{ inputs.raw_log }}""".strip()
+      log_source = """{{ inputs.log_source }}""".strip()
+
       # Demo log scenarios if no input provided
       demo_logs = [
         {
           "message": "FATAL: Connection pool exhausted - max_connections=100 exceeded",
-          "source": "postgresql",
-          "timestamp": datetime.now().isoformat()
+          "source": "postgresql"
         },
         {
           "message": "ERROR: Memory usage exceeded 95% threshold on node-3",
-          "source": "prometheus",
-          "timestamp": datetime.now().isoformat()
+          "source": "prometheus"
         },
         {
           "message": "CRITICAL: Auth service returning 503 - unable to validate tokens",
-          "source": "auth-service",
-          "timestamp": datetime.now().isoformat()
+          "source": "auth-service"
         }
       ]
-      
-      if not raw_log or raw_log == "":
-        # Use a demo log
-        import random
+
+      if not raw_log:
         selected_log = random.choice(demo_logs)
         raw_log = selected_log["message"]
         log_source = selected_log["source"]
-      
-      # Normalize the data
+
       normalized = {
         "timestamp": datetime.now().isoformat(),
-        "source": log_source,
+        "source": log_source or "unknown",
         "message": raw_log,
         "raw": raw_log
       }
-      
+
       print(json.dumps(normalized))
 
-  - id: ai-analysis
-    type: io.kestra.plugin.openai.ChatCompletion
-    apiKey: "{{ secret('ANTHROPIC_API_KEY') }}"
-    model: "claude-sonnet-4-20250514"
-    baseUrl: "https://api.anthropic.com/v1"
-    prompt: |
-      You are an expert SRE analyzing infrastructure logs. Analyze this log and respond ONLY with valid JSON (no markdown, no explanation):
-      
-      LOG: {{ outputs['normalize-input'].vars.stdout }}
-      
-      Respond with this exact JSON structure:
-      {
-        "severity": "critical|high|medium|low",
-        "category": "database|network|memory|disk|auth|application",
-        "summary": "One line description of the issue",
-        "suggested_fix": "Specific action to fix this issue",
-        "affected_file": "path/to/config/file if applicable or null",
-        "confidence": 0.85
-      }
-
-  - id: parse-ai-response
+  - id: analyze-or-use-provided
     type: io.kestra.plugin.scripts.python.Script
     containerImage: python:3.11-slim
     script: |
       import json
       import re
-      
-      # Get AI response
-      ai_output = """{{ outputs['ai-analysis'].choices[0].message.content }}"""
-      
-      # Remove markdown code blocks if present
-      ai_output = re.sub(r'```json\s*', '', ai_output)
-      ai_output = re.sub(r'```\s*', '', ai_output)
-      ai_output = ai_output.strip()
-      
-      # Parse JSON
-      try:
-        analysis = json.loads(ai_output)
-        
-        # Ensure all required fields
-        analysis.setdefault('severity', 'medium')
-        analysis.setdefault('category', 'application')
-        analysis.setdefault('summary', 'Unknown incident')
-        analysis.setdefault('suggested_fix', 'Manual investigation required')
-        analysis.setdefault('affected_file', None)
-        analysis.setdefault('confidence', 0.5)
-        
-        print(json.dumps(analysis))
-      except json.JSONDecodeError as e:
-        # Fallback if parsing fails
-        fallback = {
-          "severity": "medium",
-          "category": "application",
-          "summary": "Log analysis parsing failed",
-          "suggested_fix": "Manual review required",
+
+      # Check if severity/category were provided directly
+      provided_severity = """{{ inputs.severity }}""".strip()
+      provided_category = """{{ inputs.category }}""".strip()
+      provided_summary = """{{ inputs.summary }}""".strip()
+      provided_fix = """{{ inputs.suggested_fix }}""".strip()
+
+      if provided_severity and provided_category:
+        # Use provided values from monitoring script
+        analysis = {
+          "severity": provided_severity,
+          "category": provided_category,
+          "summary": provided_summary or "Incident detected",
+          "suggested_fix": provided_fix or "Manual investigation required",
           "affected_file": None,
-          "confidence": 0.3
+          "confidence": 0.9
         }
-        print(json.dumps(fallback))
+      else:
+        # Simple rule-based analysis (no external AI needed for demo)
+        log_data = json.loads("""{{ outputs['normalize-input'].vars.stdout }}""")
+        message = log_data.get("message", "").lower()
+
+        # Determine severity
+        if "fatal" in message or "critical" in message or "oom" in message:
+          severity = "critical"
+        elif "error" in message or "fail" in message:
+          severity = "high"
+        elif "warn" in message:
+          severity = "medium"
+        else:
+          severity = "low"
+
+        # Determine category
+        if any(word in message for word in ["database", "postgres", "mysql", "connection pool", "max_connections"]):
+          category = "database"
+        elif any(word in message for word in ["memory", "oom", "heap", "ram"]):
+          category = "memory"
+        elif any(word in message for word in ["disk", "storage", "space"]):
+          category = "disk"
+        elif any(word in message for word in ["network", "timeout", "connection refused"]):
+          category = "network"
+        elif any(word in message for word in ["auth", "login", "permission", "403", "401"]):
+          category = "auth"
+        else:
+          category = "application"
+
+        # Generate summary
+        summary = log_data.get("message", "Unknown incident")[:100]
+
+        # Suggest fix based on category
+        fixes = {
+          "database": "Check database connections and increase max_connections if needed",
+          "memory": "Increase memory limits or investigate memory leaks",
+          "disk": "Clean up disk space or expand storage",
+          "network": "Check network connectivity and firewall rules",
+          "auth": "Verify credentials and authentication configuration",
+          "application": "Check application logs for detailed error information"
+        }
+
+        analysis = {
+          "severity": severity,
+          "category": category,
+          "summary": summary,
+          "suggested_fix": fixes.get(category, "Manual investigation required"),
+          "affected_file": None,
+          "confidence": 0.7
+        }
+
+      print(json.dumps(analysis))
 
   - id: create-incident
     type: io.kestra.plugin.core.http.Request
@@ -158,88 +157,44 @@ tasks:
     contentType: application/json
     body: |
       {
-        "severity": "{{ json(outputs['parse-ai-response'].vars.stdout).severity }}",
-        "category": "{{ json(outputs['parse-ai-response'].vars.stdout).category }}",
-        "summary": "{{ json(outputs['parse-ai-response'].vars.stdout).summary }}",
-        "description": "{{ outputs['normalize-input'].vars.stdout }}",
-        "suggested_fix": "{{ json(outputs['parse-ai-response'].vars.stdout).suggested_fix }}",
-        "affected_file": "{{ json(outputs['parse-ai-response'].vars.stdout).affected_file }}",
+        "severity": "{{ json(outputs['analyze-or-use-provided'].vars.stdout).severity }}",
+        "category": "{{ json(outputs['analyze-or-use-provided'].vars.stdout).category }}",
+        "summary": "{{ json(outputs['analyze-or-use-provided'].vars.stdout).summary }}",
+        "description": "{{ json(outputs['normalize-input'].vars.stdout).message }}",
+        "suggested_fix": "{{ json(outputs['analyze-or-use-provided'].vars.stdout).suggested_fix }}",
         "raw_log": "{{ json(outputs['normalize-input'].vars.stdout).message }}",
         "source": "{{ json(outputs['normalize-input'].vars.stdout).source }}",
         "kestra_execution_id": "{{ execution.id }}",
-        "confidence": {{ json(outputs['parse-ai-response'].vars.stdout).confidence }}
+        "confidence": {{ json(outputs['analyze-or-use-provided'].vars.stdout).confidence }}
       }
 
-  - id: decision-router
+  - id: log-incident-created
+    type: io.kestra.plugin.core.log.Log
+    message: |
+      Incident created: {{ json(outputs['create-incident'].body).id }}
+      Severity: {{ json(outputs['analyze-or-use-provided'].vars.stdout).severity }}
+      Category: {{ json(outputs['analyze-or-use-provided'].vars.stdout).category }}
+      Summary: {{ json(outputs['analyze-or-use-provided'].vars.stdout).summary }}
+
+  - id: check-severity
     type: io.kestra.plugin.core.flow.If
-    condition: "{{ json(outputs['parse-ai-response'].vars.stdout).severity == 'critical' or json(outputs['parse-ai-response'].vars.stdout).severity == 'high' }}"
+    condition: "{{ json(outputs['analyze-or-use-provided'].vars.stdout).severity == 'critical' or json(outputs['analyze-or-use-provided'].vars.stdout).severity == 'high' }}"
     then:
       - id: trigger-autofix
         type: io.kestra.plugin.core.flow.Subflow
         namespace: devops.healing
         flowId: auto-fix-workflow
-        wait: true
-        transmitFailed: true
+        wait: false
         inputs:
           incident_id: "{{ json(outputs['create-incident'].body).id }}"
-          severity: "{{ json(outputs['parse-ai-response'].vars.stdout).severity }}"
-          summary: "{{ json(outputs['parse-ai-response'].vars.stdout).summary }}"
+          severity: "{{ json(outputs['analyze-or-use-provided'].vars.stdout).severity }}"
+          summary: "{{ json(outputs['analyze-or-use-provided'].vars.stdout).summary }}"
     else:
-      - id: log-only
+      - id: log-low-severity
         type: io.kestra.plugin.core.log.Log
-        message: "Low/Medium severity incident logged: {{ json(outputs['parse-ai-response'].vars.stdout).summary }}"
-
-  - id: notify-dashboard
-    type: io.kestra.plugin.core.http.Request
-    uri: "{{ vars.dashboard_url }}/api/kestra-webhook"
-    method: POST
-    contentType: application/json
-    body: |
-      {
-        "type": "incident_processed",
-        "execution_id": "{{ execution.id }}",
-        "incident_id": "{{ json(outputs['create-incident'].body).id }}",
-        "severity": "{{ json(outputs['parse-ai-response'].vars.stdout).severity }}",
-        "summary": "{{ json(outputs['parse-ai-response'].vars.stdout).summary }}",
-        "status": "{{ json(outputs['parse-ai-response'].vars.stdout).severity == 'critical' or json(outputs['parse-ai-response'].vars.stdout).severity == 'high' ? 'auto-fix-triggered' : 'logged' }}"
-      }
+        message: "Low/Medium severity incident logged - no auto-fix triggered"
 
 errors:
   - id: error-handler
-    type: io.kestra.plugin.core.flow.Sequential
-    tasks:
-      - id: update-incident-error-status
-        type: io.kestra.plugin.core.http.Request
-        uri: "{{ vars.mcp_server_url }}/incidents/{{ json(outputs['create-incident'].body).id || 'unknown' }}"
-        method: PATCH
-        contentType: application/json
-        body: |
-          {
-            "status": "failed",
-            "error_message": "Main orchestration failed during {{ task.id }}: {{ task.status }}",
-            "error_details": "{{ execution.errors }}"
-          }
-
-      - id: notify-dashboard-error
-        type: io.kestra.plugin.core.http.Request
-        uri: "{{ vars.dashboard_url }}/api/kestra-webhook"
-        method: POST
-        contentType: application/json
-        body: |
-          {
-            "type": "orchestration_error",
-            "execution_id": "{{ execution.id }}",
-            "error_task": "{{ task.id }}",
-            "error_status": "{{ task.status }}",
-            "error_message": "AI orchestration failed during incident processing"
-          }
-
-      - id: log-error
-        type: io.kestra.plugin.core.log.Log
-        level: ERROR
-        message: |
-          ❌ Orchestration ERROR:
-          Task: {{ task.id }}
-          Status: {{ task.status }}
-          Error Details: {{ execution.errors }}
-          Incident ID: {{ json(outputs['create-incident'].body).id || 'unknown' }}
+    type: io.kestra.plugin.core.log.Log
+    message: "Error in orchestrator flow"

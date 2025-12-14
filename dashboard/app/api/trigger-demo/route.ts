@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
+    // Log the request for debugging
+    console.log('Trigger demo request received:', {
+      method: request.method,
+      url: request.url,
+      headers: Object.fromEntries(request.headers.entries())
+    });
     const body = await request.json()
 
     // Trigger Kestra workflow webhook to start the full orchestration process
@@ -63,7 +69,7 @@ export async function POST(request: NextRequest) {
     // Fallback: return success anyway for demo purposes
     const demoIncident = {
       log_source: 'dashboard-demo',
-      raw_log: body.log || 'CRITICAL: Database connection pool exhausted - max_connections=100 exceeded',
+      raw_log: 'CRITICAL: Database connection pool exhausted - max_connections=100 exceeded',
       fallback: true
     }
 

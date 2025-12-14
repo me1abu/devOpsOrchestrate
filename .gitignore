@@ -69,6 +69,7 @@ kestra-data/
 *.db
 *.sqlite
 postgres-data/
+mcp-server/data/
 
 # Misc
 .cache/

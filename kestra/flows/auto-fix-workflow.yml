@@ -11,13 +11,10 @@ variables:
 inputs:
   - id: incident_id
     type: STRING
-    required: true
   - id: severity
     type: STRING
-    required: true
   - id: summary
     type: STRING
-    required: true
 
 tasks:
   - id: get-incident-details
@@ -38,16 +35,16 @@ tasks:
   - id: notify-cline-human
     type: io.kestra.plugin.core.log.Log
     message: |
-      ⚠️ CRITICAL INCIDENT DETECTED - CLINE ACTION REQUIRED ⚠️
-      
+      CRITICAL INCIDENT DETECTED - CLINE ACTION REQUIRED
+
       Incident ID: {{ inputs.incident_id }}
       Severity: {{ inputs.severity }}
       Summary: {{ inputs.summary }}
-      
-      📋 CLINE WORKFLOW INSTRUCTIONS:
-      
+
+      CLINE WORKFLOW INSTRUCTIONS:
+
       1. Open Cline in your IDE
-      2. Ensure the MCP Server is connected (check ~/.config/cline/mcp_settings.json)
+      2. Ensure the MCP Server is connected
       3. Ask Cline to: "Check for pending DevOps incidents and fix them"
       4. Cline will use the MCP tools to:
          - get_pending_incidents() - Find this incident
@@ -56,73 +53,14 @@ tasks:
          - Generate and apply fixes
          - Create a GitHub PR
          - report_fix_status() - Update status
-      
-      5. Once Cline completes, the workflow will continue automatically
-      
-      Incident Details: {{ outputs['get-incident-details'].body }}
-      
-      ⏰ Waiting for Cline to complete the fix...
+
+      Waiting for Cline to complete the fix...
 
   - id: wait-for-fix
-    type: io.kestra.plugin.core.flow.ForEachItem
-    items: "{{ range(1, 30) }}"  # Poll for up to 30 iterations (5 minutes at 10s intervals)
-    itemLabel: "Poll attempt {{ index }}"
-    iterable: "{{ range(1, 30) }}"
-    tasks:
-      - id: check-fix-status-polling
-        type: io.kestra.plugin.core.http.Request
-        uri: "{{ vars.mcp_server_url }}/incidents/{{ inputs.incident_id }}"
-        method: GET
-        timeout: PT30S  # 30 second timeout per request
+    type: io.kestra.plugin.core.flow.Pause
+    delay: PT2M
 
-      - id: evaluate-fix-result-polling
-        type: io.kestra.plugin.scripts.python.Script
-        containerImage: python:3.11-slim
-        beforeCommands:
-          - pip install requests
-        script: |
-          import json
-          import sys
-
-          try:
-            # Get incident status
-            incident_data = json.loads("""{{ outputs['check-fix-status-polling'].body }}""")
-            status = incident_data.get('status', 'pending')
-
-            # Stop polling if incident is resolved
-            if status in ['fixed', 'failed', 'needs_review']:
-              result = {
-                "completed": True,
-                "status": status,
-                "pr_url": incident_data.get('pr_url'),
-                "incident_data": incident_data
-              }
-              print(json.dumps(result))
-              sys.exit(0)  # Success - exit the loop
-            else:
-              result = {
-                "completed": False,
-                "status": status,
-                "attempt": {{ index }}
-              }
-              print(json.dumps(result))
-              sys.exit(1)  # Continue polling
-
-          except Exception as e:
-            result = {
-              "completed": False,
-              "error": str(e),
-              "attempt": {{ index }}
-            }
-            print(json.dumps(result))
-            sys.exit(1)
-
-      - id: wait-before-next-poll
-        type: io.kestra.plugin.core.flow.Sleep
-        duration: PT10S  # Wait 10 seconds between polls
-        disabled: "{{ json(outputs['evaluate-fix-result-polling'].vars.stdout).completed == true }}"
-
-  - id: get-final-incident-status
+  - id: check-fix-status
     type: io.kestra.plugin.core.http.Request
     uri: "{{ vars.mcp_server_url }}/incidents/{{ inputs.incident_id }}"
     method: GET
@@ -132,20 +70,20 @@ tasks:
     containerImage: python:3.11-slim
     script: |
       import json
-      
+
       # Get incident status after Cline processing
       incident = json.loads("""{{ outputs['check-fix-status'].body }}""")
-      
+
       status = incident.get('status', 'pending')
       pr_url = incident.get('pr_url', '')
-      
+
       result = {
         "success": status == "fixed",
         "status": status,
-        "pr_url": pr_url,
-        "message": f"Fix {'completed' if status == 'fixed' else 'pending'}"
+        "pr_url": pr_url or "",
+        "message": "Fix completed" if status == "fixed" else "Fix pending"
       }
-      
+
       print(json.dumps(result))
 
   - id: notify-completion
@@ -159,14 +97,13 @@ tasks:
         "execution_id": "{{ execution.id }}",
         "incident_id": "{{ inputs.incident_id }}",
         "status": "{{ json(outputs['evaluate-fix-result'].vars.stdout).status }}",
-        "pr_url": "{{ json(outputs['evaluate-fix-result'].vars.stdout).pr_url }}",
-        "success": {{ json(outputs['evaluate-fix-result'].vars.stdout).success }}
+        "pr_url": "{{ json(outputs['evaluate-fix-result'].vars.stdout).pr_url }}"
       }
 
   - id: final-log
     type: io.kestra.plugin.core.log.Log
     message: |
-      ✅ Auto-fix workflow completed for incident {{ inputs.incident_id }}
+      Auto-fix workflow completed for incident {{ inputs.incident_id }}
       Status: {{ json(outputs['evaluate-fix-result'].vars.stdout).status }}
       PR URL: {{ json(outputs['evaluate-fix-result'].vars.stdout).pr_url }}
 
@@ -179,5 +116,5 @@ errors:
     body: |
       {
         "status": "failed",
-        "error_message": "Auto-fix workflow failed: {{ task.id }}"
+        "fix_notes": "Auto-fix workflow failed"
       }
