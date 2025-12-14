@@ -1,106 +1,420 @@
-# Self-Healing DevOps Orchestrator
+# 🔧 AutoSRE- A Self-Healing DevOps Orchestrator
 
-An autonomous agent that monitors software infrastructure, detects incidents using a custom-trained model, and autonomously writes code to fix them using an agentic workflow.
+<div align="center">
 
-## 🏗️ System Architecture
+![Self-Healing DevOps](https://img.shields.io/badge/DevOps-Self--Healing-blueviolet?style=for-the-badge&logo=kubernetes)
+![AI Powered](https://img.shields.io/badge/AI-Powered-orange?style=for-the-badge&logo=openai)
+![Hackathon](https://img.shields.io/badge/Hackathon-2025-success?style=for-the-badge)
+
+**Autonomous incident detection, AI-powered analysis, and self-healing code generation.**
+
+*Zero human intervention from alert to pull request.*
+
+[Live Dashboard](https://autosre.vercel.app) • [Demo Video](https://youtu.be/jRd42nvgtBM) • [Architecture](https://github.com/me1abu/devOpsOrchestrate/blob/main/self-healing-devops-architecture.md)) • [Quick Start](https://github.com/me1abu/devOpsOrchestrate/blob/main/SETUP.md))
+
+</div>
+
+---
+
+## 🎯 The Problem
+
+DevOps teams are drowning:
+
+- **500+ alerts daily** - Most are noise, but critical ones hide in the chaos
+- **Hours spent diagnosing** - Manually correlating logs, metrics, and traces
+- **Repetitive fixes** - The same issues require the same solutions
+- **Human bottleneck** - Engineers are the single point of failure at 3 AM
+
+**What if infrastructure could heal itself?**
+
+---
+
+## 💡 The Solution
+
+An **autonomous agent** that:
+
+1. 🔍 **Detects** infrastructure incidents in real-time
+2. 🧠 **Analyzes** root causes using AI-powered log analysis
+3. 🔧 **Generates** code fixes automatically via agentic workflows
+4. 📝 **Submits** pull requests for review
+5. ✅ **Validates** changes with AI-powered code review
 
 ```
-Logs/Incidents → Kestra (Orchestration) → Oumi (Analysis) → Cline (Fix) → GitHub → CodeRabbit
-                      ↓
-                 Dashboard (Vercel)
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Incident  │────▶│   Kestra    │────▶│  Cline MCP  │────▶│  GitHub PR  │
+│  Detection  │     │ Orchestrator│     │  Auto-Fix   │     │  + Review   │
+└─────────────┘     └──────┬──────┘     └─────────────┘     └─────────────┘
+                          │
+                    ┌─────▼─────┐
+                    │    AI     │
+                    │ Analysis  │
+                    └───────────┘
 ```
+
+---
+
+## 🏆 Hackathon Prize Tracks
+
+This project targets **$15,000** across 5 sponsor tracks:
+
+| Sponsor | Prize | Integration |
+|---------|-------|-------------|
+| **Kestra** | $4,000 | Workflow orchestration with AI Agent plugin |
+| **Cline** | $5,000 | Custom MCP Server for autonomous code generation |
+| **Oumi** | $3,000 | Fine-tuned SRE-LLM for log analysis |
+| **Vercel** | $2,000 | Real-time mission control dashboard |
+| **CodeRabbit** | $1,000 | AI-powered PR reviews of generated fixes |
+
+---
+
+## 🏗️ Architecture
+
+```
+                            ┌──────────────────────────────────────────┐
+                            │           SELF-HEALING PIPELINE          │
+                            └──────────────────────────────────────────┘
+
+    ┌─────────────┐         ┌─────────────────────────────────────────────────────┐
+    │             │         │                                                     │
+    │  Log Source │────────▶│  ┌─────────┐    ┌─────────┐    ┌──────────────┐   │
+    │  (Webhook)  │         │  │ Kestra  │───▶│   AI    │───▶│  Severity    │   │
+    │             │         │  │ Trigger │    │ Analysis│    │  Router      │   │
+    └─────────────┘         │  └─────────┘    └─────────┘    └──────┬───────┘   │
+                            │                                       │           │
+                            │            ┌──────────────────────────┴───┐       │
+                            │            ▼                              ▼       │
+                            │  ┌─────────────────┐          ┌────────────────┐  │
+                            │  │  HIGH/CRITICAL  │          │   LOW/MEDIUM   │  │
+                            │  │  ┌───────────┐  │          │                │  │
+                            │  │  │ MCP Server│  │          │  Log & Alert   │  │
+                            │  │  │  (Cline)  │  │          │                │  │
+                            │  │  └─────┬─────┘  │          └────────────────┘  │
+                            │  │        │        │                              │
+                            │  │  ┌─────▼─────┐  │                              │
+                            │  │  │ Generate  │  │                              │
+                            │  │  │   Fix     │  │                              │
+                            │  │  └─────┬─────┘  │                              │
+                            │  │        │        │                              │
+                            │  │  ┌─────▼─────┐  │                              │
+                            │  │  │ Create PR │  │                              │
+                            │  │  └─────┬─────┘  │                              │
+                            │  └────────┼────────┘                              │
+                            │           │                                       │
+                            └───────────┼───────────────────────────────────────┘
+                                        │
+                                        ▼
+                            ┌───────────────────────┐
+                            │      CodeRabbit       │
+                            │    AI Code Review     │
+                            └───────────────────────┘
+                                        │
+                                        ▼
+                            ┌───────────────────────┐
+                            │    ✅ Merge Ready     │
+                            └───────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                         REAL-TIME DASHBOARD                             │
+    │                         (Vercel - Next.js)                              │
+    │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐ │
+    │  │System Health │  │  Incidents   │  │ Activity Feed│  │   Metrics   │ │
+    │  └──────────────┘  └──────────────┘  └──────────────┘  └─────────────┘ │
+    └─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ✨ Key Features
+
+### 🤖 Autonomous Incident Detection
+- Webhook-based ingestion from any monitoring tool
+- Real-time log analysis and classification
+- Severity-based routing (Critical → Auto-fix, Low → Log only)
+
+### 🧠 AI-Powered Analysis
+- Custom SRE-LLM trained on infrastructure patterns
+- Root cause identification
+- Suggested remediation with confidence scores
+
+### 🔧 Automatic Code Generation
+- Cline MCP Server integration for autonomous coding
+- Context-aware fixes based on repository structure
+- Automatic PR creation with detailed descriptions
+
+### 📊 Real-Time Dashboard
+- Live incident tracking
+- Activity stream with SSE updates
+- System health monitoring
+- Demo controls for testing
+
+### ✅ AI Code Review
+- CodeRabbit integration for automated PR reviews
+- AI reviewing AI-generated code
+- Quality gates before merge
+
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- Python 3.10+
 - Docker & Docker Compose
 - Git
-- GitHub Account
-- **AI API Key**: OpenAI API key (GPT-4) - free credits available for new users
+- GitHub Account + Personal Access Token
+- OpenAI API Key
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
-cd DevOps\ Orches
+git clone https://github.com/me1abu/devOpsOrchestrate.git
+cd devOpsOrchestrate
 
-# Install dependencies
-npm install
-
-# Set up environment variables
+# Copy environment variables
 cp .env.example .env
 # Edit .env with your API keys
 
-# Start infrastructure
+# Start the infrastructure
 docker-compose up -d
 
-# Train Oumi model (optional, can use Claude fallback)
-cd oumi
-pip install -r requirements.txt
-python train.py --config config.yaml
-
-# Start MCP Server
-cd mcp-server
-npm install
-npm run build
-npm run dev
-
-# Start Dashboard
+# Start the dashboard (development)
 cd dashboard
 npm install
 npm run dev
 ```
 
-### Demo
+### Access Points
 
-```bash
-# Trigger a demo incident
-curl -X POST http://localhost:8080/api/v1/webhooks/incident-webhook \
-  -H "Content-Type: application/json" \
-  -d '{"log": "ERROR: Connection pool exhausted", "source": "postgresql"}'
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Dashboard | http://localhost:3000 | - |
+| Kestra UI | http://localhost:8080 | admin@kestra.io / Kestra123 |
+| MCP Server | http://localhost:3001 | - |
 
-# Visit dashboard
-open http://localhost:3000
-```
+---
 
 ## 📦 Project Structure
 
 ```
-├── oumi/                  # Oumi model training
-├── kestra/                # Kestra workflow definitions
-├── mcp-server/            # Cline MCP Server
-├── dashboard/             # Next.js dashboard
-├── demo/                  # Demo scripts and test data
-└── docs/                  # Documentation
+devOpsOrchestrate/
+├── 📂 dashboard/              # Next.js real-time dashboard
+│   ├── app/                   # App router pages
+│   ├── components/            # React components
+│   └── Dockerfile
+│
+├── 📂 kestra/flows/           # Kestra workflow definitions
+│   ├── main-orchestrator.yml  # Main incident processing flow
+│   └── auto-fix-workflow.yml  # Autonomous remediation flow
+│
+├── 📂 mcp-server/             # Cline MCP Server
+│   ├── src/
+│   │   ├── index.ts           # Express server + SSE
+│   │   └── tools.ts           # MCP tool definitions
+│   └── Dockerfile
+│
+├── 📂 oumi/                   # Oumi model training
+│   ├── data/                  # Training data (JSONL)
+│   ├── train.py               # Training script
+│   └── config.yaml            # Model configuration
+│
+├── 📂 monitoring/             # Demo monitoring setup
+├── 📂 scripts/                # Utility scripts
+├── 🐳 docker-compose.yml      # Full stack deployment
+└── 📄 README.md
 ```
 
-## 🎯 Key Features
+---
 
-1. **Autonomous Incident Detection**: Custom-trained model understands infrastructure errors
-2. **Intelligent Orchestration**: Kestra workflows route incidents based on severity
-3. **Automatic Code Fixes**: Cline generates PRs to fix issues
-4. **Real-time Monitoring**: Live dashboard showing all activity
-5. **AI Quality Control**: CodeRabbit reviews all generated code
+## 🔌 MCP Server Tools
 
-## 📖 Documentation
+The MCP Server exposes these tools for Cline integration:
 
-- [Architecture Overview](./self-healing-devops-architecture.md)
-- [Setup Guide](./docs/setup.md)
-- [Demo Script](./docs/demo-script.md)
+| Tool | Description |
+|------|-------------|
+| `get_pending_incidents()` | Fetch unresolved incidents |
+| `get_incident_details(id)` | Get full incident context |
+| `get_repository_context()` | Understand codebase structure |
+| `apply_fix(incident_id, fix)` | Apply generated fix |
+| `create_pull_request(...)` | Create GitHub PR |
+| `report_fix_status(...)` | Update incident status |
 
-## 🎥 Demo Video
+### API Endpoints
 
-[Link to demo video]
+```
+GET  /              # API documentation
+GET  /health        # Health check
+GET  /events        # SSE stream for real-time updates
+GET  /incidents     # List all incidents
+POST /incidents     # Create new incident
+GET  /incidents/:id # Get incident details
+PATCH /incidents/:id # Update incident
+GET  /stats         # Get statistics
+```
+
+---
+
+## 🎬 Demo
+
+### Live Deployment
+
+- **Dashboard**: [autosre.vercel.app](https://autosre.vercel.app)
+- **MCP Server**: [mcp-server-deploy.up.railway.app](https://mcp-server-deploy.up.railway.app)
+
+### Demo Video
+
+[📺 Watch the 3-minute demo](#) *(Coming soon)*
+
+### Trigger a Demo Incident
+
+```bash
+curl -X POST https://mcp-server-deploy.up.railway.app/incidents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "severity": "critical",
+    "category": "database",
+    "summary": "Connection pool exhausted",
+    "description": "FATAL: max_connections=100 exceeded",
+    "source": "postgresql"
+  }'
+```
+
+---
+
+## 🛠️ Sponsor Technology Deep Dive
+
+### Kestra - Workflow Orchestration
+
+```yaml
+# Example: Main orchestrator flow
+id: self-healing-orchestrator
+namespace: devops.healing
+
+tasks:
+  - id: analyze-incident
+    type: io.kestra.plugin.scripts.python.Script
+    script: |
+      # AI-powered log analysis
+      # Severity classification
+      # Root cause identification
+
+  - id: trigger-autofix
+    type: io.kestra.plugin.core.flow.If
+    condition: "{{ severity == 'critical' }}"
+    then:
+      - id: call-mcp-server
+        type: io.kestra.plugin.core.http.Request
+        uri: "{{ mcp_server_url }}/fix"
+```
+
+### Cline - MCP Server Integration
+
+```typescript
+// MCP tools for autonomous code generation
+const tools = [
+  {
+    name: "get_pending_incidents",
+    description: "Fetch incidents awaiting fixes",
+    handler: async () => await db.getIncidents({ status: "pending" })
+  },
+  {
+    name: "create_pull_request",
+    description: "Create a GitHub PR with the fix",
+    handler: async ({ title, body, branch }) => {
+      return await github.createPR({ title, body, branch });
+    }
+  }
+];
+```
+
+### Oumi - Custom SRE Model
+
+```python
+# Training data format
+{
+  "input": "FATAL: Connection pool exhausted - max_connections=100 exceeded",
+  "output": {
+    "severity": "critical",
+    "category": "database",
+    "root_cause": "Connection pool limit reached",
+    "suggested_fix": "Increase max_connections or implement connection pooling"
+  }
+}
+```
+
+### Vercel - Dashboard Deployment
+
+- Next.js 14 with App Router
+- Real-time updates via Server-Sent Events
+- Responsive design with Tailwind CSS
+
+### CodeRabbit - AI Code Review
+
+```yaml
+# .coderabbit.yaml
+reviews:
+  auto_review:
+    enabled: true
+  path_filters:
+    - "!**/*.md"
+  tools:
+    github-checks:
+      enabled: true
+```
+
+---
+
+## 🔮 Future Roadmap
+
+- [ ] **Multi-cloud support** - AWS, GCP, Azure integrations
+- [ ] **Slack/PagerDuty integration** - Alert routing
+- [ ] **Learning from feedback** - Improve fixes based on PR reviews
+- [ ] **Rollback automation** - Auto-revert failed deployments
+- [ ] **Cost optimization** - Infrastructure right-sizing recommendations
+
+---
 
 ## 🤝 Contributing
 
-This is a hackathon project. Contributions welcome!
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) first.
+
+```bash
+# Fork the repo
+# Create your feature branch
+git checkout -b feature/amazing-feature
+
+# Commit your changes
+git commit -m 'Add amazing feature'
+
+# Push to the branch
+git push origin feature/amazing-feature
+
+# Open a Pull Request
+```
+
+---
 
 ## 📄 License
 
-MIT
+MIT License - see [LICENSE](LICENSE) for details.
 
+---
+
+## 👤 Author
+
+**Abu**
+
+- GitHub: [@me1abu](https://github.com/me1abu)
+
+---
+
+<div align="center">
+
+### ⭐ Star this repo if you find it useful!
+
+**Built with ❤️ for the AI Hackathon 2025**
+
+*"The best incident is the one that fixes itself."*
+
+</div>
