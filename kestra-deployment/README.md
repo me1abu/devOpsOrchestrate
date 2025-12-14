@@ -32,25 +32,19 @@ git push -u origin main
 - Note the connection URL (Railway provides this as `DATABASE_URL`)
 
 ### 6. **Configure Environment Variables**
-In Railway project settings → Variables, add these **exact** environment variables:
+🚨 **Important**: Try both approaches below if the first doesn't work.
+
+#### **Method A: Individual Variables**
+In Railway project settings → Variables, add these environment variables:
 
 ```bash
 # Database (Railway provides this automatically - DO NOT change)
 DATABASE_URL=postgresql://postgres:xxxxx@containers-us-west-xxx.railway.app:xxxx/railway
 
-# Required Configuration Properties
-KESTRA_REPOSITORY_TYPE=postgres
-KESTRA_STORAGE_TYPE=local
-KESTRA_QUEUE_TYPE=postgres
-KESTRA_SERVER_BASIC_AUTH_ENABLED=true
-
 # Authentication
 KESTRA_USERNAME=admin@kestra.io
 KESTRA_PASSWORD=your_secure_password_here
-
-# URLs and Storage
 KESTRA_URL=https://your-kestra-app-name.railway.app
-KESTRA_STORAGE_LOCAL_BASE_PATH=/app/storage
 
 # Optional (for advanced features)
 OPENAI_API_KEY=your_openai_api_key
@@ -59,7 +53,34 @@ GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
 WEBHOOK_SECRET=your_webhook_secret
 ```
 
-**🚨 CRITICAL:** Unlike other deployments, Railway requires **individual environment variables**, not a YAML configuration block. Copy each variable exactly as shown above.
+**Note:** Railway sometimes needs the full YAML configuration. If individual variables fail, try Method B.
+
+#### **Method B: YAML Configuration Block**
+Replace all individual variables with a single YAML configuration:
+
+```bash
+# Single YAML configuration (Railway might need this format)
+KESTRA_CONFIGURATION: |
+  datasources:
+    postgres:
+      url: postgresql://postgres:xxxxx@containers-us-west-xxx.railway.app:xxxx/railway
+      driverClassName: org.postgresql.Driver
+  kestra:
+    server:
+      basic-auth:
+        enabled: true
+        username: admin@kestra.io
+        password: your_secure_password_here
+    repository:
+      type: postgres
+    storage:
+      type: local
+      local:
+        base-path: "/app/storage"
+    queue:
+      type: postgres
+    url: https://your-kestra-app-name.railway.app
+```
 
 ### 7. **Deploy**
 - Railway will build and deploy automatically
