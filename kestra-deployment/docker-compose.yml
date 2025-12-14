@@ -1,0 +1,43 @@
+version: '3.8'
+services:
+  kestra:
+    image: kestra/kestra:latest
+    pull_policy: always
+    command: /app/kestra server standalone --worker-thread=128
+    environment:
+      # Railway provides PostgreSQL automatically via DATABASE_URL
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: ${DATABASE_URL:-jdbc:postgresql://localhost:5432/kestra}
+            driverClassName: org.postgresql.Driver
+            username: ${DATABASE_USERNAME:-kestra}
+            password: ${DATABASE_PASSWORD:-k3str4}
+        kestra:
+          server:
+            basic-auth:
+              enabled: true
+              username: ${KESTRA_USERNAME:-admin@kestra.io}
+              password: ${KESTRA_PASSWORD:-Kestra123}
+          repository:
+            type: postgres
+          storage:
+            type: local
+            local:
+              base-path: "/app/storage"
+          queue:
+            type: postgres
+          url: ${KESTRA_URL:-http://localhost:8080}
+    volumes:
+      - kestra-data:/app/storage
+      - /tmp/kestra-wd:/tmp/kestra-wd
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  kestra-data:

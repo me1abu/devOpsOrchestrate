@@ -1,0 +1,120 @@
+id: auto-fix-workflow
+namespace: devops.healing
+description: Autonomous fix workflow that triggers Cline via MCP to generate and submit PRs
+
+variables:
+  mcp_server_url: "http://mcp-server:3001"
+  dashboard_url: "http://dashboard:3000"
+  github_repo: "{{ envs.GITHUB_REPO }}"
+  github_owner: "{{ envs.GITHUB_OWNER }}"
+
+inputs:
+  - id: incident_id
+    type: STRING
+  - id: severity
+    type: STRING
+  - id: summary
+    type: STRING
+
+tasks:
+  - id: get-incident-details
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ vars.mcp_server_url }}/incidents/{{ inputs.incident_id }}"
+    method: GET
+
+  - id: update-incident-processing
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ vars.mcp_server_url }}/incidents/{{ inputs.incident_id }}"
+    method: PATCH
+    contentType: application/json
+    body: |
+      {
+        "status": "processing"
+      }
+
+  - id: notify-cline-human
+    type: io.kestra.plugin.core.log.Log
+    message: |
+      CRITICAL INCIDENT DETECTED - CLINE ACTION REQUIRED
+
+      Incident ID: {{ inputs.incident_id }}
+      Severity: {{ inputs.severity }}
+      Summary: {{ inputs.summary }}
+
+      CLINE WORKFLOW INSTRUCTIONS:
+
+      1. Open Cline in your IDE
+      2. Ensure the MCP Server is connected
+      3. Ask Cline to: "Check for pending DevOps incidents and fix them"
+      4. Cline will use the MCP tools to:
+         - get_pending_incidents() - Find this incident
+         - get_incident_details({{ inputs.incident_id }}) - Get full context
+         - get_repository_context() - Understand the codebase
+         - Generate and apply fixes
+         - Create a GitHub PR
+         - report_fix_status() - Update status
+
+      Waiting for Cline to complete the fix...
+
+  - id: wait-for-fix
+    type: io.kestra.plugin.core.flow.Pause
+    delay: PT2M
+
+  - id: check-fix-status
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ vars.mcp_server_url }}/incidents/{{ inputs.incident_id }}"
+    method: GET
+
+  - id: evaluate-fix-result
+    type: io.kestra.plugin.scripts.python.Script
+    containerImage: python:3.11-slim
+    script: |
+      import json
+
+      # Get incident status after Cline processing
+      incident = json.loads("""{{ outputs['check-fix-status'].body }}""")
+
+      status = incident.get('status', 'pending')
+      pr_url = incident.get('pr_url', '')
+
+      result = {
+        "success": status == "fixed",
+        "status": status,
+        "pr_url": pr_url or "",
+        "message": "Fix completed" if status == "fixed" else "Fix pending"
+      }
+
+      print(json.dumps(result))
+
+  - id: notify-completion
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ vars.dashboard_url }}/api/kestra-webhook"
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "type": "fix_completed",
+        "execution_id": "{{ execution.id }}",
+        "incident_id": "{{ inputs.incident_id }}",
+        "status": "{{ json(outputs['evaluate-fix-result'].vars.stdout).status }}",
+        "pr_url": "{{ json(outputs['evaluate-fix-result'].vars.stdout).pr_url }}"
+      }
+
+  - id: final-log
+    type: io.kestra.plugin.core.log.Log
+    message: |
+      Auto-fix workflow completed for incident {{ inputs.incident_id }}
+      Status: {{ json(outputs['evaluate-fix-result'].vars.stdout).status }}
+      PR URL: {{ json(outputs['evaluate-fix-result'].vars.stdout).pr_url }}
+
+errors:
+  - id: error-handler
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ vars.mcp_server_url }}/incidents/{{ inputs.incident_id }}"
+    method: PATCH
+    contentType: application/json
+    body: |
+      {
+        "status": "failed",
+        "fix_notes": "Auto-fix workflow failed"
+      }
