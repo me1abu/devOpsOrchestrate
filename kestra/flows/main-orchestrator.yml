@@ -3,8 +3,8 @@ namespace: devops.healing
 description: Main orchestration flow for incident detection and auto-fix
 
 variables:
- mcp_server_url: "http://mcp-server:3001" || "https://mcp-server-deploy.up.railway.app"
-  dashboard_url: "http://dashboard:3000" || "https://autosre.vercel.app"
+  mcp_server_url: process.env.NEXT_PUBLIC_MCP_SERVER_URL || "http://mcp-server:3001"
+  dashboard_url: process.env.DASHBOARD_URL || "http://dashboard:3000"
 
 triggers:
   - id: webhook-trigger
