@@ -32,29 +32,34 @@ git push -u origin main
 - Note the connection URL (Railway provides this as `DATABASE_URL`)
 
 ### 6. **Configure Environment Variables**
-In Railway project settings, add these environment variables:
+In Railway project settings → Variables, add these **exact** environment variables:
 
 ```bash
-# Required Database (Railway auto-provides)
+# Database (Railway provides this automatically - DO NOT change)
 DATABASE_URL=postgresql://postgres:xxxxx@containers-us-west-xxx.railway.app:xxxx/railway
+
+# Required Configuration Properties
+KESTRA_REPOSITORY_TYPE=postgres
+KESTRA_STORAGE_TYPE=local
+KESTRA_QUEUE_TYPE=postgres
+KESTRA_SERVER_BASIC_AUTH_ENABLED=true
 
 # Authentication
 KESTRA_USERNAME=admin@kestra.io
 KESTRA_PASSWORD=your_secure_password_here
 
-# OpenAI for AI features (optional)
+# URLs and Storage
+KESTRA_URL=https://your-kestra-app-name.railway.app
+KESTRA_STORAGE_LOCAL_BASE_PATH=/app/storage
+
+# Optional (for advanced features)
 OPENAI_API_KEY=your_openai_api_key
-
-# Kestra Configuration
-KESTRA_URL=https://your-app-name.railway.app
-
-# GitHub Integration (optional)
-GITHUB_CLIENT_ID=your_github_app_client_id
-GITHUB_CLIENT_SECRET=your_github_app_client_secret
-
-# Webhook Secret (generate random string)
-WEBHOOK_SECRET=your_random_secret_string
+GITHUB_CLIENT_ID=your_github_oauth_client_id
+GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
+WEBHOOK_SECRET=your_webhook_secret
 ```
+
+**🚨 CRITICAL:** Unlike other deployments, Railway requires **individual environment variables**, not a YAML configuration block. Copy each variable exactly as shown above.
 
 ### 7. **Deploy**
 - Railway will build and deploy automatically
